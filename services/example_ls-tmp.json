@@ -1,0 +1,8 @@
+{
+	"name": "example: ls-tmp",
+	"work_directory": "/tmp",
+	"command": [
+		"/bin/ls",
+		"-l"
+	]
+}

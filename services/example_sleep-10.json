@@ -1,0 +1,8 @@
+{
+	"name": "example: sleep-10",
+	"work_directory": "/tmp",
+	"command": [
+		"/bin/sleep",
+		"10"
+	]
+}
