@@ -67,6 +67,8 @@ def generate_main_function(service_structs):
 	result_code = [
 		"#include \"run_service.h\"",
 		"",
+		"/* This is generated file */",
+		"",
 		"int main(int argc, char ** argv) {", ]
 	serv_struct_ptrs = []
 	for serv_struct_name, serv_def_code, in service_structs:
