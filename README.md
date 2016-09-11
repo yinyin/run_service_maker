@@ -27,6 +27,12 @@ The code file of main function will be put at `run_service/main.c`.
 The service runner executable can be build with `make.sh` script or the `Makefile` in the `run_service/` folder.
 
 
+## Run as PID-1 in Container
+
+Define `KILL_SUBJECT_PID` as -1 to make service runner stop *every* process inside the container might be a good idea
+for building a service runner to running as PID-1 of a container.
+
+
 ## License
 
 This project is licensed under `The MIT License`.
