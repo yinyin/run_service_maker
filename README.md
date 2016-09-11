@@ -25,6 +25,10 @@ python maker/make_main.py services/example_sleep-10.json services/example_ls-tmp
 The code file of main function will be put at `run_service/main.c`.
 
 The service runner executable can be build with `make.sh` script or the `Makefile` in the `run_service/` folder.
+Result binary will be placed at `run_service/run_service`.
+
+Run the result binary will start configured programs. The program will be restarted when it is stopped.
+SIGTERM signal will be emit to running program when SIGTERM or SIGINT are received.
 
 
 ## Run as PID-1 in Container
