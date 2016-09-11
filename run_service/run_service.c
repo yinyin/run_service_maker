@@ -13,7 +13,9 @@
 
 #define MIN_RESTART_SECOND 30
 
-#define KILL_SUBJECT 0
+#ifndef KILL_SUBJECT_PID
+	#define KILL_SUBJECT_PID 0
+#endif
 
 #define RECORD_ERR(msg, srcfile, srcline) {	\
 	int errnum;	\
@@ -124,7 +126,7 @@ static int check_services_stopped(ServiceDefinition * const services[]) {
 
 static void stop_services(ServiceDefinition * const services[]) {
 	int i;
-	kill(KILL_SUBJECT, SIGTERM);
+	kill(KILL_SUBJECT_PID, SIGTERM);
 	for (i = 100; i > 0; i--) {
 		check_child_process(services);
 		if (0 == check_services_stopped(services)) {
@@ -132,7 +134,7 @@ static void stop_services(ServiceDefinition * const services[]) {
 		}
 		sleep(2);
 	}
-	kill(KILL_SUBJECT, SIGKILL);
+	kill(KILL_SUBJECT_PID, SIGKILL);
 	for (i = 10; i > 0; i--) {
 		check_child_process(services);
 		if (0 == check_services_stopped(services)) {
