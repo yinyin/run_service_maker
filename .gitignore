@@ -29,5 +29,6 @@ local.properties
 *.a
 a.out
 
+run_service/main.c
 run_service/run_service
 
