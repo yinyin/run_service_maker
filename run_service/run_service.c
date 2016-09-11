@@ -8,6 +8,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "run_service.h"
+
+
 #define MIN_RESTART_SECOND 30
 
 #define KILL_SUBJECT 0
@@ -26,15 +29,6 @@ static void signal_handler_to_stop(int signum, siginfo_t *info, void *ptr) {
 	fprintf(stderr, "INFO: received signal %d\n", signum);
 }
 
-
-typedef struct _T_ServiceDefinition {
-	pid_t process_id;
-	time_t started_at;
-	const char * service_name;
-	const char * work_directory;
-	const char * executable_path;
-	char * const * execute_argv;
-} ServiceDefinition;
 
 #if 0
 static void print_service(const ServiceDefinition * serv) {
@@ -149,28 +143,25 @@ static void stop_services(ServiceDefinition * const services[]) {
 }
 
 
-int main(int argc, char ** argv) {
-	char * const SERVICE_SLEEP_ARGV[] = {"sleep", "10", NULL};
-	ServiceDefinition SERVICE_SLEEP = {.process_id=0,
-			.started_at=0,
-			.service_name="sleep-10",
-			.work_directory="/tmp",
-			.executable_path="/bin/sleep",
-			.execute_argv=SERVICE_SLEEP_ARGV};
-	ServiceDefinition * const services[] = {
-		&SERVICE_SLEEP, NULL};
+void run_services(ServiceDefinition * const services[]) {
 	struct sigaction signal_action;
+	struct sigaction prev_sigint_signal_action;
+	struct sigaction prev_sigterm_signal_action;
 	memset(&signal_action, 0, sizeof(signal_action));
+	memset(&prev_sigint_signal_action, 0, sizeof(prev_sigint_signal_action));
+	memset(&prev_sigterm_signal_action, 0, sizeof(prev_sigterm_signal_action));
 	signal_action.sa_sigaction = signal_handler_to_stop;
 	signal_action.sa_flags = SA_SIGINFO;
-	sigaction(SIGINT, &signal_action, NULL);
-	sigaction(SIGTERM, &signal_action, NULL);
+	sigaction(SIGINT, &signal_action, &prev_sigint_signal_action);
+	sigaction(SIGTERM, &signal_action, &prev_sigterm_signal_action);
 	while (0 == flag_stop_service) {
 		start_idle_services(services);
 		check_child_process(services);
 		sleep(10);
 	}
 	fprintf(stderr, "INFO: stopping services");
+	sigaction(SIGINT, &prev_sigint_signal_action, NULL);
+	sigaction(SIGTERM, &prev_sigterm_signal_action, NULL);
 	stop_services(services);
-	return 0;
+	return;
 }
