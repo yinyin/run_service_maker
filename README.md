@@ -37,6 +37,13 @@ Define `KILL_SUBJECT_PID` as -1 to make service runner stop *every* process insi
 for building a service runner to running as PID-1 of a container.
 
 
+## Send Log Messages to Syslog
+
+By default the logging message will be send to `STDERR`. You can send logging messages to `syslog` by defining `WITH_SYSLOG` macro.
+
+The defined `WITH_SYSLOG` will be the identity for opening syslog connection. String quotes may need escape (i.e. `-DWITH_SYSLOG=\"service-runner\"`) to make sure shell will keep them for compiler.
+
+
 ## License
 
 This project is licensed under `The MIT License`.
