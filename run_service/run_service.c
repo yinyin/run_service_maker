@@ -70,6 +70,13 @@ static void start_service(ServiceDefinition * serv) {
 		RECORD_ERR("failed on changing work directory", __FILE__, __LINE__);
 		exit(17);
 	}
+	if(NULL != serv->prepare_function) {
+		int prepare_result = (*(serv->prepare_function))();
+		if(0 != prepare_result) {
+			RECORD_ERR("cannot prepare runtime environment", __FILE__, __LINE__);
+			exit(18);
+		}
+	}
 	execv(serv->executable_path, serv->execute_argv);
 	RECORD_ERR("cannot execute target program", __FILE__, __LINE__);
 	exit(20);

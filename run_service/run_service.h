@@ -10,6 +10,7 @@ typedef struct _T_ServiceDefinition {
 	time_t started_at;
 	const char * service_name;
 	const char * work_directory;
+	int (*prepare_function)();
 	const char * executable_path;
 	char * const * execute_argv;
 } ServiceDefinition;

@@ -22,18 +22,46 @@ def _c_string(s):
 	return '"' + "".join(map(_c_char_escape, s)) + '"'
 # ### def _c_string
 
+def _c_get_function_pointer(f):
+	if f:
+		return "&" + f
+	return "NULL"
+# ### def _c_get_function_pointer
+
 class ServiceDefinition(object):
-	def __init__(self, name, workdirectory, command, *args, **kwds):
+	def __init__(self, name, workdirectory, command, resourcelimit, runasuser, *args, **kwds):
 		super(ServiceDefinition, self).__init__(*args, **kwds)
 		self.name = name
 		self.workdirectory = workdirectory
 		self.command = command
+		self.resourcelimit = resourcelimit
+		self.runasuser = runasuser
 	# ### def __init__
 
 	def get_sanitized_name(self):
 		return "".join(map(lambda c: "_" if (c not in "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_") else c, self.name.upper()))
 	# ### def get_sanitized_name
+
+	def get_prepare_function_name(self):
+		if self.resourcelimit or self.runasuser:
+			return "_prepare_" + self.get_sanitized_name().lower()
+		return None
+	# ### def get_prepare_function_name
 # ### class ServiceDefinition
+
+def load_resource_limit_definition(cmap):
+	if not cmap:
+		return None
+	result = []
+	for resource_name, limit_value, in cmap.iteritems():
+		resource_name = str(resource_name).upper()
+		if "INF" == limit_value:
+			limit_value = "RLIM_INFINITY"
+		else:
+			limit_value = int(limit_value)
+		result.append((resource_name, limit_value,))
+	return result
+# ### def load_resource_limit_definition
 
 def load_service_definition(file_path):
 	with open(file_path, "r") as fp:
@@ -43,13 +71,15 @@ def load_service_definition(file_path):
 	serv_command = [str(a) for a in c["command"]]
 	if "/" != serv_command[0][0]:
 		print "WARN: 1st argument of command must be absolute path of executable - %r" (serv_command[0],)
-	return ServiceDefinition(serv_name, serv_workdirectory, serv_command)
+	serv_resourcelimit = load_resource_limit_definition(c.get("limit"))
+	serv_runasuser = c.get("run_as")
+	return ServiceDefinition(serv_name, serv_workdirectory, serv_command, serv_resourcelimit, serv_runasuser)
 # ### def load_service_definition
 
 def generate_service_definition_structure(serv):
 	serv_struct_name = "SERVICE_"+ serv.get_sanitized_name()
 	serv_argv_name = serv_struct_name + "_ARGV"
-	
+
 	argv_content = list(map(_c_string, serv.command))
 	argv_content.append("NULL")
 	result_code = [
@@ -58,6 +88,7 @@ def generate_service_definition_structure(serv):
 		"\t\t.started_at=0,",
 		"\t\t.service_name=" + _c_string(serv.name) + ",",
 		"\t\t.work_directory=" + _c_string(serv.workdirectory) + ",",
+		"\t\t.prepare_function=" + _c_get_function_pointer(serv.get_prepare_function_name()) + ",",
 		"\t\t.executable_path=" + argv_content[0] + ",",
 		"\t\t.execute_argv=" + serv_argv_name + "};", ]
 	return (serv_struct_name, result_code,)
