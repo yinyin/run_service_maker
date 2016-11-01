@@ -15,6 +15,8 @@ def _c_char_escape(c):
 		return "\\\""
 	if "'" == c:
 		return "\\'"
+	if "\n" == c:
+		return "\\n"
 	return c
 # ### def _c_char_escape
 
@@ -85,7 +87,7 @@ def load_service_definition(file_path):
 # ### def load_service_definition
 
 def make_error_verbose_code_block(message_text, return_code):
-	t = message_text + ': %s @[%s:%d]\\n'
+	t = message_text + ": %s @[%s:%d]\n"
 	return (
 	"int errnum;",
 	"errnum = errno;"
@@ -96,7 +98,7 @@ def make_error_verbose_code_block(message_text, return_code):
 def make_prepare_resource_limit(serv):
 	if not serv.resourcelimit:
 		return None
-	required_include = ("sys/time.h", "sys/resource.h", "errno.h", "string.h", )
+	required_include = ("sys/time.h", "sys/resource.h", "errno.h", "string.h", "stdio.h", )
 	err_return_code = 21
 	struct_code = []
 	runset_code = []
@@ -115,7 +117,7 @@ def make_prepare_resource_limit(serv):
 def make_prepare_run_as_user(serv):
 	if not serv.runasuser:
 		return None
-	required_include = ("sys/types.h", "pwd.h", "errno.h", "string.h", "unistd.h", )
+	required_include = ("sys/types.h", "pwd.h", "errno.h", "string.h", "unistd.h", "stdio.h", )
 	result_code = [
 		"struct passwd *p;",
 		"uid_t runner_uid;",
