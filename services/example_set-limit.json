@@ -1,0 +1,13 @@
+{
+	"name": "example: set-limit",
+	"work_directory": "/tmp",
+	"command": [
+		"/bin/cat",
+		"/proc/self/limits"
+	],
+	"run_as": "nobody",
+	"limit": {
+		"RLIMIT_NOFILE": 102400,
+		"RLIMIT_MEMLOCK": "INF"
+	}
+}
