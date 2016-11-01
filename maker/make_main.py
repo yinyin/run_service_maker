@@ -90,7 +90,7 @@ def make_error_verbose_code_block(message_text, return_code):
 	t = message_text + ": %s @[%s:%d]\n"
 	return (
 	"int errnum;",
-	"errnum = errno;"
+	"errnum = errno;",
 	"fprintf(stderr, " + _c_string(t) + ", strerror(errnum), __FILE__, __LINE__);",
 	"return " + str(return_code) + ";", )
 # ### def make_error_verbose_code_block
