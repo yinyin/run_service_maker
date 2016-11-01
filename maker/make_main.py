@@ -30,7 +30,9 @@ def _c_get_function_pointer(f):
 
 def _indent_code(code_lines, prepend="", indent="\t"):
 	for l in code_lines:
-		if isinstance(l, basestring):
+		if l is None:
+			yield None
+		elif isinstance(l, basestring):
 			if l:
 				yield prepend + l
 			else:
@@ -83,7 +85,7 @@ def load_service_definition(file_path):
 # ### def load_service_definition
 
 def make_error_verbose_code_block(message_text, return_code):
-	t = message_text + ': %s @[%s:%d]\n'
+	t = message_text + ': %s @[%s:%d]\\n'
 	return (
 	"int errnum;",
 	"errnum = errno;"
@@ -148,7 +150,9 @@ def generate_service_prepare_function(serv):
 			continue
 		using_include, prepare_code, = aux
 		required_include.update(using_include)
-		result_code.append(("{", _indent_code(prepare_code), "}", ))
+		result_code.append("{")
+		result_code.append(prepare_code)
+		result_code.append("}")
 	if result_code:
 		result_code = [
 			"static int " + prepare_func_name + "() {",
@@ -182,9 +186,9 @@ def generate_service_definition_structure(serv):
 # ### def generate_service_definition_structure
 
 def generate_main_function(service_structs):
+	required_includes = set()
 	prepare_func_code = []
 	main_func_code = ["int main(int argc, char ** argv) {", ]
-	required_includes = set()
 	serv_struct_ptrs = []
 	for prepare_function_name, prepare_function_include, prepare_function_code, serv_struct_name, serv_def_code, in service_structs:
 		if prepare_function_name:
@@ -192,20 +196,22 @@ def generate_main_function(service_structs):
 			prepare_func_code.append(None)
 			prepare_func_code.extend(prepare_function_code)
 		serv_struct_ptrs.append("&" + serv_struct_name)
-		main_func_code.extend(_indent_code(serv_def_code, prepend="\t"))
+		main_func_code.append(serv_def_code)
 	serv_struct_ptrs.append("NULL")
-	main_func_code.append("\tServiceDefinition * const services[] = {")
-	main_func_code.append("\t\t" + ", ".join(serv_struct_ptrs) + "};")
-	main_func_code.append("\trun_services(services);")
-	main_func_code.append("\treturn 0;")
+	main_func_code.append((
+		"ServiceDefinition * const services[] = {",
+		"\t" + ", ".join(serv_struct_ptrs) + "};",
+		"run_services(services);",
+		"return 0;", ))
 	main_func_code.append("}")
 	result_code = []
 	if required_includes:
-		result_code.extend(map(lambda l: "#include<" + l + ">", sorted(required_includes)))
+		result_code.extend(map(lambda l: "#include <" + l + ">", sorted(required_includes)))
 		result_code.append(None)
 	result_code.append("#include \"run_service.h\"")
 	result_code.append(None)
 	result_code.append("/* This is generated file */")
+	result_code.extend(prepare_func_code)
 	result_code.append(None)
 	result_code.extend(main_func_code)
 	result_code.append(None)
@@ -222,9 +228,13 @@ def _main():
 	service_structs = map(generate_service_definition_structure, service_definitions)
 	main_code = generate_main_function(service_structs)
 	with open("run_service/main.c", "w") as fp:
-		for l in main_code:
+		for l in _indent_code(main_code):
 			if l:
-				fp.write(l)
+				try:
+					fp.write(l)
+				except:
+					print l
+					raise
 			fp.write("\n")
 	return 0
 # ### def _main
