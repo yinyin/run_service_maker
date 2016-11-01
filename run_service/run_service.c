@@ -17,11 +17,46 @@
 	#define KILL_SUBJECT_PID 0
 #endif
 
-#define RECORD_ERR(msg, srcfile, srcline) {	\
-	int errnum;	\
-	errnum = errno;	\
-	fprintf(stderr, "ERR: %s: %s @[%s:%d]\n", msg, strerror(errnum), srcfile, srcline);	\
-}
+#ifdef WITH_SYSLOG
+	#include <syslog.h>
+
+	#define RECORD_OPEN() { openlog(WITH_SYSLOG, LOG_CONS | LOG_PERROR | LOG_PID, LOG_USER); }
+
+	#define RECORD_INFO(srcfile, srcline, msg, ...) {	\
+		syslog(LOG_NOTICE, msg " @[%s:%d]\n", ##__VA_ARGS__, srcfile, srcline);	\
+	}
+
+	#define RECORD_WARN(srcfile, srcline, msg, ...) {	\
+		syslog(LOG_WARNING, msg " @[%s:%d]\n", ##__VA_ARGS__, srcfile, srcline);	\
+	}
+
+	#define RECORD_ERR(srcfile, srcline, msg, ...) {	\
+		int errnum;	\
+		errnum = errno;	\
+		syslog(LOG_ERR, msg ": %s @[%s:%d]\n", ##__VA_ARGS__, strerror(errnum), srcfile, srcline);	\
+	}
+
+	#define RECORD_CLOSE() { closelog(); }
+#else
+	#define RECORD_OPEN() { }
+
+	#define RECORD_INFO(srcfile, srcline, msg, ...) {	\
+		fprintf(stderr, "INFO: " msg " @[%s:%d]\n", ##__VA_ARGS__, srcfile, srcline);	\
+	}
+
+	#define RECORD_WARN(srcfile, srcline, msg, ...) {	\
+		fprintf(stderr, "WARN: " msg " @[%s:%d]\n", ##__VA_ARGS__, srcfile, srcline);	\
+	}
+
+	#define RECORD_ERR(srcfile, srcline, msg, ...) {	\
+		int errnum;	\
+		errnum = errno;	\
+		fprintf(stderr, "ERR: " msg ": %s @[%s:%d]\n", ##__VA_ARGS__, strerror(errnum), srcfile, srcline);	\
+	}
+
+	#define RECORD_CLOSE() { }
+#endif
+
 
 
 static volatile int flag_stop_service = 0;
@@ -49,17 +84,17 @@ static void start_service(ServiceDefinition * serv) {
 
 	time(&now_tstamp);
 	if ((now_tstamp - serv->started_at) < MIN_RESTART_SECOND) {
-		fprintf(stderr, "ERR: restart too frequently (service-name: %s) @[%s:%d]\n", serv->service_name, __FILE__, __LINE__);
+		RECORD_WARN(__FILE__, __LINE__, "restart too frequently (service-name: %s)", serv->service_name);
 		return;
 	}
 	serv->started_at = now_tstamp;
 	if((pid_t)(0) != serv->process_id) {
-		fprintf(stderr, "WARN: cannot start service with process-id == 0 @[%s:%d]\n", __FILE__, __LINE__);
+		RECORD_WARN(__FILE__, __LINE__, "cannot start service with process-id == 0");
 		return;
 	}
 	child_pid = fork();
 	if((pid_t)(-1) == child_pid) {
-		RECORD_ERR("cannot fork child process", __FILE__, __LINE__);
+		RECORD_ERR(__FILE__, __LINE__, "cannot fork child process");
 		return;
 	} else if(0 != child_pid) {
 		serv->process_id = child_pid;
@@ -67,18 +102,18 @@ static void start_service(ServiceDefinition * serv) {
 	}
 	/* child process */
 	if(0 != chdir(serv->work_directory)) {
-		RECORD_ERR("failed on changing work directory", __FILE__, __LINE__);
+		RECORD_ERR(__FILE__, __LINE__, "failed on changing work directory");
 		exit(17);
 	}
 	if(NULL != serv->prepare_function) {
 		int prepare_result = (*(serv->prepare_function))();
 		if(0 != prepare_result) {
-			RECORD_ERR("cannot prepare runtime environment", __FILE__, __LINE__);
+			RECORD_ERR(__FILE__, __LINE__, "cannot prepare runtime environment");
 			exit(18);
 		}
 	}
 	execv(serv->executable_path, serv->execute_argv);
-	RECORD_ERR("cannot execute target program", __FILE__, __LINE__);
+	RECORD_ERR(__FILE__, __LINE__, "cannot execute target program");
 	exit(20);
 }
 
@@ -90,7 +125,7 @@ static void check_child_process(ServiceDefinition * const services[]) {
 		if((pid_t)(0) == kid_pid) {
 			return;
 		} else if((pid_t)(-1) == kid_pid) {
-			RECORD_ERR("failed on waitpid", __FILE__, __LINE__);
+			RECORD_ERR(__FILE__, __LINE__, "failed on waitpid");
 			return;
 		} else  {
 			int i;
@@ -99,9 +134,9 @@ static void check_child_process(ServiceDefinition * const services[]) {
 				if (kid_pid == serv->process_id) {
 					serv->process_id = (pid_t)(0);
 					if (WIFEXITED(prg_exitcode)) {
-						fprintf(stderr, "WARN: service stopped (ret-code=%d, service-name: %s) @[%s:%d]\n", WEXITSTATUS(prg_exitcode), serv->service_name, __FILE__, __LINE__);
+						RECORD_WARN(__FILE__, __LINE__, "service stopped (ret-code=%d, service-name: %s)", WEXITSTATUS(prg_exitcode), serv->service_name);
 					} else {
-						fprintf(stderr, "WARN: service stopped (terminate-signal=%d, service-name: %s) @[%s:%d]\n", WTERMSIG(prg_exitcode), serv->service_name, __FILE__, __LINE__);
+						RECORD_WARN(__FILE__, __LINE__, "service stopped (terminate-signal=%d, service-name: %s)", WTERMSIG(prg_exitcode), serv->service_name);
 					}
 					break;
 				}
@@ -156,6 +191,7 @@ void run_services(ServiceDefinition * const services[]) {
 	struct sigaction signal_action;
 	struct sigaction prev_sigint_signal_action;
 	struct sigaction prev_sigterm_signal_action;
+	RECORD_OPEN();
 	memset(&signal_action, 0, sizeof(signal_action));
 	memset(&prev_sigint_signal_action, 0, sizeof(prev_sigint_signal_action));
 	memset(&prev_sigterm_signal_action, 0, sizeof(prev_sigterm_signal_action));
@@ -168,9 +204,10 @@ void run_services(ServiceDefinition * const services[]) {
 		check_child_process(services);
 		sleep(10);
 	}
-	fprintf(stderr, "INFO: stopping services");
+	RECORD_INFO(__FILE__, __LINE__, "stopping services");
 	sigaction(SIGINT, &prev_sigint_signal_action, NULL);
 	sigaction(SIGTERM, &prev_sigterm_signal_action, NULL);
 	stop_services(services);
+	RECORD_CLOSE();
 	return;
 }
