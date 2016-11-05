@@ -3,6 +3,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <signal.h>
+#include <dirent.h>
 #include <time.h>
 #include <string.h>
 #include <stdio.h>
@@ -78,6 +79,35 @@ static void print_service(const ServiceDefinition * serv) {
 }
 #endif
 
+static int close_fd_impl_procfs_fdfolder(const char *fdfolder_path)
+{
+	int dirfd_val;
+	DIR *dirp;
+	struct dirent *p;
+
+	if(NULL == (dirp = opendir(fdfolder_path))) {
+		fprintf(stderr, "WARN: cannot open file descriptor folder @[%s:%d]", __FILE__, __LINE__);
+		return 1;
+	}
+	dirfd_val = dirfd(dirp);
+	while(NULL != (p = readdir(dirp))) {
+		int fd_val;
+		char *endp;
+		fd_val = (int)(strtol(p->d_name, &endp, 10));
+		if( (p->d_name != endp) && ('\0' == *endp) && (fd_val != dirfd_val) && (fd_val > 2) ) {
+			if(0 != close(fd_val)) {
+				fprintf(stderr, "WARN: failed on close file descriptor (fd=%d) @[%s:%d]", fd_val, __FILE__, __LINE__);
+			}
+		}
+	}
+
+	if(0 != closedir(dirp)) {
+		fprintf(stderr, "WARN: failed on close procfs file descriptor folder @[%s:%d]", __FILE__, __LINE__);
+	}
+
+	return 0;
+}
+
 static void start_service(ServiceDefinition * serv) {
 	pid_t child_pid;
 	time_t now_tstamp;
@@ -101,6 +131,11 @@ static void start_service(ServiceDefinition * serv) {
 		return;
 	}
 	/* child process */
+#if __APPLE__
+	close_fd_impl_procfs_fdfolder("/dev/fd");
+#elif __linux__ || __linux
+	close_fd_impl_procfs_fdfolder("/proc/self/fd");
+#endif
 	if(0 != chdir(serv->work_directory)) {
 		RECORD_ERR(__FILE__, __LINE__, "failed on changing work directory");
 		exit(17);
